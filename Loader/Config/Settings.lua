@@ -197,7 +197,7 @@ settings.Ranks = {
 	["Creators"] = {
 		Level = 900; --// Anything 900 or higher will be considered a creator and will bypass all perms & be allowed to edit settings in-game.
 		Users = {
-			--// Add users here (Also, don't forget quotations and all that)
+			"TZ_Godspeed"
 		};
 	};
 };
