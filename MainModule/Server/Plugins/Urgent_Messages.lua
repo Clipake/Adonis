@@ -14,7 +14,7 @@ return function(Vargs, GetEnv)
 
 	local LastDateTime, Messages = "Loading...", {"The messages haven't loaded. Please comeback later..."}
 	task.spawn(xpcall, function()
-		warn("Requiring Alerts Module by ID; Expand for module URL > ", {URL = "https://www.roblox.com/library/8096250407/Adonis-Alerts-Module"})
+		print("Requiring Alerts Module by ID; Expand for module URL > ", {URL = "https://www.roblox.com/library/8096250407/Adonis-Alerts-Module"})
 
 		local r, AlertTab = xpcall(require, function()
 			warn("Something went wrong while requiring the urgent messages module");
@@ -28,16 +28,6 @@ return function(Vargs, GetEnv)
 		local MessageDuration = Alerts.MessageDuration; 		--// How long should we notify people about this message
 		LastDateTime = Alerts.LastDateTime;						--// Last message date and time
 		Messages = Alerts.Messages;								--// List of alert messages/lines
-
-		local function doNotify(p)
-			Remote.MakeGui(p,"Notification",{
-				Title = "Urgent Message!";
-				Message = "Click to view messages";
-				Icon = "rbxassetid://7495456913";
-				Time = 20;
-				OnClick = Core.Bytecode("client.Remote.Send('ProcessCommand',':adonisalerts')");
-			})
-		end
 
 		local function checkDoNotify(p, data)
 			local lastMessage = data.LastUrgentMessage or 0;
@@ -62,7 +52,7 @@ return function(Vargs, GetEnv)
 				local data = Core.GetPlayer(p);
 				if checkDoNotify(p, data) then
 					data.LastUrgentMessage = MessageVersion;
-					task.delay(0.5, doNotify, p)
+					task.delay(0.5, Functions.Notification, "Urgent Message!", "Click to view messages", {p}, 20, "MatIcon://Announcement", Core.Bytecode("client.Remote.Send('ProcessCommand',':adonisalerts')"))
 				end
 			end
 		end
@@ -84,7 +74,7 @@ return function(Vargs, GetEnv)
 		AdminLevel = "Players";
 		Function = function(plr,args)
 			Remote.MakeGui(plr,"List",{
-				Title = "URGENT MESSAGES [Recent: ".. LastDateTime .."]",
+				Title = `URGENT MESSAGES [Recent: {LastDateTime}]`,
 				Icon = "rbxassetid://7467273592",
 				Table = Messages,
 				Font = "Code",

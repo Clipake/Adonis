@@ -15,13 +15,39 @@ return function(Vargs, GetEnv)
 
 	local TeleportService: TeleportService = service.TeleportService
 	local Players: Players = service.Players
+	local teleportedPlayers = setmetatable({}, {__mode = "k"})
+	local isPrivateServer = game.PrivateServerId ~= "" and game.PrivateServerOwnerId == 0
 
 	local PARAMETER_NAME = "ADONIS_SOFTSHUTDOWN"
+	local PARAMETER_2_NAME = "ADONIS_SHUTDOWN_REJOIN"
+	local MAX_RETRIES = 4
+	local RETRY_WAIT = 1.5
 
-	if game.PrivateServerId ~= "" and game.PrivateServerOwnerId == 0  then
+	TeleportService.TeleportInitFailed:Connect(function(player, result, message, placeId, options)
+		if teleportedPlayers[player] and placeId == game.PlaceId and not table.find({Enum.TeleportResult.Success, Enum.TeleportResult.IsTeleporting}, result) then
+			if teleportedPlayers[player] < MAX_RETRIES then
+				task.wait(RETRY_WAIT * teleportedPlayers[player])
+				teleportedPlayers[player] += 1
+				Logs:AddLog("Script", `Failed to teleport {player.Name} {isPrivateServer and "back to the main game" or "to a temporary softshutdown server"} due to {result.Name}. Retrying... Details: {message}`)
+				Functions.Notification("Teleport failed", `SoftShutdown failed to teleport {isPrivateServer and "back to the main game" or "to a temporary softshutdown server"}. Retrying...`, {player}, 10, "MatIcon://Warning")
+				TeleportService:Teleport(game.PlaceId, player, {[PARAMETER_2_NAME] = true})
+			else
+				Logs:AddLog("Script", `Failed to teleport {player.Name} {isPrivateServer and "back to the main game" or "to a temporary softshutdown server"} due to {result.Name}. Details: {message}`)
+				Logs:AddLog("Error", `Failed to teleport {player.Name} {isPrivateServer and "back to the main game" or "to a temporary softshutdown server"} to {result.Name}. Details: {message}`)
+				Functions.Notification("Teleport failed", `SoftShutdown failed to teleport {isPrivateServer and "back to the main game" or "to a temporary softshutdown server"}. Details {message}`, {player}, 35, "MatIcon://Error")
+			end
+		end
+	end)
+
+	if isPrivateServer then
 		--// This is a reserved server
 
 		local waitTime = 5
+		local playersToTeleport = {}
+		local jobid
+		local startTask, TeleportTask = service.Threads.NewTask("Teleport Players", function()
+			jobid = TeleportService:TeleportPartyAsync(game.PlaceId, playersToTeleport, {[PARAMETER_2_NAME] = true})
+		end)
 		local function teleport(player)
 			local joindata = player:GetJoinData()
 			local data = type(joindata) == "table" and joindata.TeleportData
@@ -35,18 +61,25 @@ return function(Vargs, GetEnv)
 					Time = 1000
 				})
 
-				wait(waitTime)
+				task.wait(waitTime)
 				waitTime /= 2
 
-				TeleportService:Teleport(game.PlaceId, player)
+				Logs:AddLog("Script", `Teleporting {player.Name} back to the main game`)
+				teleportedPlayers[player] = 1
+				table.insert(playersToTeleport, player)
 			end
 		end
 
-		service.Events.PlayerAdded:Connect(teleport)
+		service.Events.PlayerAdded:Connect(function(player)
+			if TeleportTask.Running then
+				TeleportTask.Finished:wait()
+			end
+			TeleportService:TeleportToPlaceInstance(game.PlaceId, jobid, player, "", {[PARAMETER_2_NAME] = true})
+		end)
 		for _, player in ipairs(service.GetPlayers()) do
 			teleport(player)
 		end
-
+		startTask()
 	end
 
 	Remote.Terminal.Commands.SoftShutdown = {
@@ -59,11 +92,18 @@ return function(Vargs, GetEnv)
 			if #Players:GetPlayers() == 0 then return end
 
 			local newserver = TeleportService:ReserveServer(game.PlaceId)
-			Functions.Message('Adonis', "Server Restart", "The server is restarting, please wait...", 'MatIcon://Hourglass empty', service.GetPlayers(), false, 1000)
+			Functions.Message("Adonis", "Server Restart", "The server is restarting, please wait...", 'MatIcon://Hourglass empty', service.GetPlayers(), false, 1000)
 			task.wait(2)
 
+			for _, v in Players:GetPlayers() do
+				teleportedPlayers[v] = 1
+			end
+
+			Logs:AddLog("Script", `Teleporting {#Players:GetPlayers()} players to a temporary softshutdown server`)
 			TeleportService:TeleportToPrivateServer(game.PlaceId, newserver, Players:GetPlayers(), "", {[PARAMETER_NAME] = true})
 			Players.PlayerAdded:Connect(function(player)
+				Logs:AddLog("Script", `Teleporting {player.Name} to a temporary softshutdown server`)
+				teleportedPlayers[player] = 1
 				TeleportService:TeleportToPrivateServer(game.PlaceId, newserver, { player }, "", {[PARAMETER_NAME] = true})
 			end)
 
@@ -111,11 +151,18 @@ return function(Vargs, GetEnv)
 
 
 			local newserver = TeleportService:ReserveServer(game.PlaceId)
-			Functions.Message('Adonis', "Server Restart", "The server is restarting, please wait...", 'MatIcon://Hourglass empty', service.GetPlayers(), false, 1000)
+			Functions.Message("Adonis", "Server Restart", "The server is restarting, please wait...", 'MatIcon://Hourglass empty', service.GetPlayers(), false, 1000)
 			task.wait(1)
 
+			for _, v in Players:GetPlayers() do
+				teleportedPlayers[v] = 1
+			end
+
+			Logs:AddLog("Script", `Teleporting {#Players:GetPlayers()} players to a temporary softshutdown server`)
 			TeleportService:TeleportToPrivateServer(game.PlaceId, newserver, Players:GetPlayers(), "", {[PARAMETER_NAME] = true})
 			Players.PlayerAdded:Connect(function(player)
+				Logs:AddLog("Script", `Teleporting {player.Name} to a temporary softshutdown server`)
+				teleportedPlayers[player] = 1
 				TeleportService:TeleportToPrivateServer(game.PlaceId, newserver, { player }, "", {[PARAMETER_NAME] = true})
 			end)
 
@@ -123,6 +170,76 @@ return function(Vargs, GetEnv)
 				Players.PlayerRemoving:Wait()
 			end
 			-- done
+		end
+	}
+	Commands.GlobalSoftShutdown = {
+		Prefix = Settings.Prefix;
+		Commands = {"globalsoftshutdown", "globalrestart", "globalsshutdown", "grestart"};
+		Args = {"reason (default: none)", "time<s,m> (default: instant)", "abortable (default: true)"};
+		Description = "Performs a global restart on all servers after set time. (Abortable specifies whether VIP server owners can abort the restart on their own servers.)";
+		Filter = true;
+		AdminLevel = "HeadAdmins";
+		CrossServerDenied = true;
+		IsCrossServer = true;
+		Function = function(plr: Player, args: {string})
+			local time
+			if args[2] then
+				time = string.lower(args[2])
+				if time:sub(-1,-1)=="s" then
+					time = tonumber(time:sub(1,-2))
+				elseif time:sub(-1,-1)=="m" then
+					time = tonumber(time:sub(1,-2))*60
+				else
+					error("Invalid time specified.");
+				end
+				assert(time, "Invalid time specified.")
+			end
+			if not Core.CrossServer("GlobalRestartRequest",
+				args[1] or "No reason specified.",
+				if args[2] then tonumber(args[2]) else args[2],
+				not (string.lower(args[3])=="no" or string.lower(args[3])=="false")
+				)
+			then
+				error("CrossServer handler not ready (try again later)")
+			end
+		end
+	}
+	Commands.AbortGlobalSoftShutdown = {
+		Prefix = Settings.Prefix;
+		Commands = {"abortglobalsoftshutdown", "abortglobalrestart", "abortglobalsshutdown", "abortgrestart"};
+		Args = {};
+		Description = "Aborts a global shutdown on all servers.";
+		Filter = true;
+		AdminLevel = "HeadAdmins";
+		CrossServerDenied = true;
+		IsCrossServer = true;
+		Function = function(plr: Player, args: {string})
+			if not Core.CrossServer("GlobalRestartRequest",
+				"[CRS_SRV]:abort",
+				0,
+				false
+				)
+			then
+				error("CrossServer handler not ready (try again later)")
+			end
+		end
+	}
+	Commands.VIPAbortGlobalServerRestart = {
+		Prefix = Settings.PlayerPrefix;
+		Commands = {"abortrestart"};
+		Args = {};
+		Description = "Aborts a global server restart";
+		NoStudio = true;
+		AdminLevel = "Players";
+		Disabled = game.PrivateServerOwnerId == 0; -- enabled only on VIP servers.
+		Function = function(plr: Player, args: {string})
+			assert(plr.UserId==game.PrivateServerOwnerId, "You don't have permission to run this command.")
+			for i,t in service.Threads.Tasks do
+				if t.Name == "GLOBALRESTART_COUNTDOWN" then
+					assert(t.abortable, "Failed to abort shutdown (access denied)")
+					t.Stop()
+				end
+			end
 		end
 	}
 end

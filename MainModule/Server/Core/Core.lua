@@ -45,7 +45,7 @@ return function(Vargs, GetEnv)
 		Core.ModuleID = data.ModuleID or 7510592873
 		Core.LoaderID = data.LoaderID or 7510622625
 		Core.DebugMode = data.DebugMode or false
-		Core.Name = Functions:GetRandom()
+		Core.Name = service.HttpService:GenerateGUID(false)
 		Core.LoadstringObj = Core.GetLoadstring()
 		Core.Loadstring = require(Core.LoadstringObj)
 
@@ -150,6 +150,8 @@ return function(Vargs, GetEnv)
 			DataStoreEnabled = true;
 			LocalDatastore = true;
 
+			CrossServerCommands = true;
+
 			Creators = true;
 			Permissions = true;
 
@@ -175,6 +177,8 @@ return function(Vargs, GetEnv)
 			Ranks = true;
 			Commands = true;
 
+			CodeExecution = true;
+
 			--// Not gonna let malicious stuff set DS_Blacklist to {} or anything!
 			DS_BLACKLIST = true;
 		};
@@ -184,6 +188,7 @@ return function(Vargs, GetEnv)
 			AdminRank = true;
 			AdminLevel = true;
 			LastLevelUpdate = true;
+			Groups = true;
 		};
 		
 		UpdatePlayerConnection = function(p)
@@ -309,7 +314,7 @@ return function(Vargs, GetEnv)
 				loader.Object:Destroy()
 			end;
 
-			local depsName = Functions:GetRandom()
+			local depsName = service.HttpService:GenerateGUID(false)
 			local folder = server.Client:Clone()
 			local acli = Deps.ClientMover:Clone();
 			local client = folder.Client
@@ -407,8 +412,8 @@ return function(Vargs, GetEnv)
 			local key = tostring(p.UserId)
 			local keys = Remote.Clients[key]
 			if keys then
-				local depsName = Functions:GetRandom()
-				local eventName = Functions:GetRandom()
+				local depsName = service.HttpService:GenerateGUID(false)
+				local eventName = service.HttpService:GenerateGUID(false)
 				local folder = server.Client:Clone()
 				local acli = Deps.ClientMover:Clone();
 				local client = folder.Client
@@ -484,13 +489,16 @@ return function(Vargs, GetEnv)
 
 		LoadClientLoader = function(p)
 			local loader = Deps.ClientLoader:Clone()
-			loader.Name = Functions.GetRandom()
+			loader.Name = service.HttpService:GenerateGUID(false)
 			loader.Parent = p:WaitForChild("PlayerGui", 60) or p:WaitForChild("Backpack")
 			loader.Disabled = false
 		end;
 
 		LoadExistingPlayer = function(p)
-			warn(`Loading existing player: {p}`)
+			AddLog(Logs.Script, {
+				Text = `Loading existing player: {p}`;
+				Desc = "Loading player that joined before Adonis loaded";
+			})
 
 			TrackTask(`Thread: Setup Existing Player: {p}`, function()
 				Process.PlayerAdded(p)
@@ -556,7 +564,7 @@ return function(Vargs, GetEnv)
 			end
 
 			if not data.Code then
-				data.Code = Functions.GetRandom()
+				data.Code = service.HttpService:GenerateGUID(false)
 			end
 
 			table.insert(Core.ExecuteScripts, data)
@@ -587,7 +595,7 @@ return function(Vargs, GetEnv)
 				`Invalid script type '{scriptType}'`
 			)
 
-			local execCode = Functions.GetRandom()
+			local execCode = service.HttpService:GenerateGUID(false)
 
 			scr.Name = `[Adonis] {scriptType}`
 
@@ -721,7 +729,7 @@ return function(Vargs, GetEnv)
 				local id = tonumber(key);
 				local player = id and service.Players:GetPlayerByUserId(id);
 				if player and (not pdata.LastDataSave or os.time() - pdata.LastDataSave >= Core.DS_AllPlayerDataSaveInterval)  then
-					TrackTask(string.format("Save data for %s", player.Name), Core.SavePlayerData, player);
+					TrackTask(string.format("Save data for %s", player.Name), Core.SavePlayerData, false, player);
 				end
 			end
 			--[[ --// OLD METHOD (Kept in case this messes anything up)
@@ -946,6 +954,10 @@ return function(Vargs, GetEnv)
 					if type(curName) == "string" then
 						--// Admins do NOT load from the DataStore with this setting
 						if curName == "Ranks" and Settings.LoadAdminsFromDS == false then
+							return nil
+						end
+						--// Prevent loading from DB to Trello ranks
+						if curName:match("Trello") and curTable and curTable.IsExternal then
 							return nil
 						end
 					end
@@ -1263,17 +1275,23 @@ return function(Vargs, GetEnv)
 					end
 
 					if SavedTables then
-						for _, tData in SavedTables do
+						for index, tData in SavedTables do
 							if tData.TableName and tData.TableKey and not ds_blacklist[tData.TableName] then
 								local data = GetData(tData.TableKey)
 								if data then
 									--// TODO: Possibly find a better way to "batch" TableUpdates to prevent script exhaustion
 									for i = 1, #data do
 										LoadData("TableUpdate", data[i])
+										if i % 250 == 0 then
+											task.wait()
+										end
 									end
 								end
 							elseif tData.Table and tData.Action then
 								LoadData("TableUpdate", tData)
+								if index % 250 == 0 then
+									task.wait()
+								end
 							end
 						end
 
@@ -1310,16 +1328,20 @@ return function(Vargs, GetEnv)
 			local print = print
 			local warn = warn
 			local pairs = pairs
+			local ipairs = ipairs
 			local next = next
 			local table = table
 			local getfenv = getfenv
 			local setfenv = setfenv
 			local require = require
 			local tostring = tostring
+			local tonumber = tonumber
+			local getmetatable = getmetatable
+			local debug = debug
+			local math = math
 			local server = server
 			local service = service
 			local Routine = env.Routine
-			local cPcall = env.cPcall
 			local MetaFunc = service.MetaFunc
 			local StartLoop = service.StartLoop
 			local API_Special = {
@@ -1469,7 +1491,74 @@ return function(Vargs, GetEnv)
 				Message = MetaFunc(Functions.Message, true);
 
 				RunCommandAsNonAdmin = MetaFunc(Admin.RunCommandAsNonAdmin, true);
+
+				GetPlayers = MetaFunc(Functions.GetPlayers, true);
 			}
+
+			if Core.DebugMode == true then
+				local DebugAPI = {
+					Env = Vargs
+				}
+
+				API.Debug = service.ReadOnly(DebugAPI) -- Allows fetching of the Debug API from within the _G API
+
+				if not service.ReplicatedStorage:FindFirstChild("Adonis_Debug_API") then -- Allows fetching from outside of _G Env (such as the command bar)
+					local pointers = {}
+
+					local function getRealEnvResult(PointerOrPath)
+						if tonumber(PointerOrPath) and pointers[PointerOrPath] then
+							return pointers[PointerOrPath], true
+						else
+							local envPath = PointerOrPath:split('/.\\')
+							local RealEnvResult = Vargs
+							for i, pathArg in ipairs(envPath) do
+								RealEnvResult = RealEnvResult[pathArg]
+							end
+							return RealEnvResult, false
+						end
+					end	
+					
+					local AdonisDebugAPIBindable = service.New("BindableFunction")
+					AdonisDebugAPIBindable.Name = "Adonis_Debug_API"
+					AdonisDebugAPIBindable.Parent = service.ReplicatedStorage
+					AdonisDebugAPIBindable.OnInvoke = function(DebugCommand,...)
+						local args = {...}
+
+						if DebugCommand == "RunEnvFunc" then
+							local FunctionInEnvToRunPath = args[1]
+							if FunctionInEnvToRunPath and type(FunctionInEnvToRunPath) == "string" then
+								local realEnvResult, isResultPointer = getRealEnvResult(FunctionInEnvToRunPath)
+								return realEnvResult(table.unpack(args,2,#args))
+							end
+						elseif DebugCommand == "GetEnvTableMeta" then
+							local TableInEnvPath = args[1]
+							if TableInEnvPath and type(TableInEnvPath) == "string" then
+								local realEnvResult, isResultPointer = getRealEnvResult(TableInEnvPath)
+								return getmetatable(realEnvResult)
+							end
+						elseif DebugCommand == "RunEnvTableMetaFunc" then
+							local TableInEnvPath = args[1]
+							local FuncToRun = args[2]
+							if TableInEnvPath and type(TableInEnvPath) == "string" then
+								local realEnvResult, isResultPointer = getRealEnvResult(TableInEnvPath)
+								local metaTableInEnv = getmetatable(realEnvResult)
+								local result = metaTableInEnv[FuncToRun](realEnvResult,table.unpack(args,3,#args))
+								local resultPointer = tostring(math.random())
+								pointers[resultPointer] = result
+
+								return service.UnWrap(result), resultPointer
+							end
+						elseif DebugCommand == "GetApi" or not DebugCommand then
+							return DebugAPI
+						end
+					end
+				end
+
+				AddLog(Logs.Script, {
+					Text = "Enabled Debug API";
+					Desc = "DebugMode is enabled on this Adonis instance, the debug API is now accessible thru the bindable and _G (if enabled).";
+				})
+			end
 
 			local AdonisGTable = service.NewProxy({
 				__index = function(tab,ind)

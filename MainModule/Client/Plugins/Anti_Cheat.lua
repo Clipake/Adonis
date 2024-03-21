@@ -292,9 +292,10 @@ return function(Vargs)
 			service.StartLoop("AntiCoreGui", 15, function()
 				xpcall(function()
 					local function getCoreUrls()
-						local coreUrls = {}
+						local coreUrls = {"rbxassetid://0", "rbxassetid://10066921516"}	-- Whitelist for Roblox Camera SFX
 						local backpack = Player:FindFirstChildOfClass("Backpack")
 						local character = Player.Character
+						local starterPack = service.StarterPack
 						local screenshotHud = service.GuiService:FindFirstChildOfClass("ScreenshotHud")
 
 						if character then
@@ -313,6 +314,14 @@ return function(Vargs)
 							end
 						end
 
+						if starterPack then
+							for _, v in ipairs(starterPack:GetChildren()) do
+								if v:IsA("BackpackItem") and service.Trim(v.TextureId) ~= "" then
+									table.insert(coreUrls, service.Trim(v.TextureId))
+								end
+							end
+						end
+								
 						if screenshotHud and service.Trim(screenshotHud.CameraButtonIcon) ~= "" then
 							table.insert(coreUrls, service.Trim(screenshotHud.CameraButtonIcon))
 						end
@@ -328,7 +337,7 @@ return function(Vargs)
 					tempDecal.Texture = "rbxasset://textures/face.png" -- Its a local asset and it's probably likely to never get removed, so it will never fail to load, unless the users PC is corrupted
 					local coreUrls = getCoreUrls()
 
-					if not (service.GuiService.MenuIsOpen or service.ContentProvider.RequestQueueSize >= 50 or Player:GetNetworkPing() >= 750) then
+					if not (service.GuiService.MenuIsOpen or service.ContentProvider.RequestQueueSize >= 50 or Player:GetNetworkPing() * 1000 >= 750) then
 						rawContentProvider.PreloadAsync(rawContentProvider, {tempDecal, tempDecal, tempDecal, service.UnWrap(service.CoreGui), tempDecal}, function(url, status)
 							if url == "rbxasset://textures/face.png" and status == Enum.AssetFetchStatus.Success then
 								activated = true
@@ -404,6 +413,7 @@ return function(Vargs)
 			local findService = service.DataModel.FindService
 			local lastLogOutput = os.clock()
 			local spoofedHumanoidCheck = Instance.new("Humanoid")
+			local lastLogIndex = 0
 
 			local lookFor = {
 				"current identity is [0789]";
@@ -518,6 +528,7 @@ return function(Vargs)
 				"Couldn't find target with input:";
 				"Found target with input:";
 				"Couldn't find the target's root part%. :[";
+				"HookMT"; --watameln was here :3
 			}
 
 			local soundIds = {
@@ -529,6 +540,7 @@ return function(Vargs)
 					if
 						not string.find(string.lower(Message), "failed to load", 1, true) and
 						not string.find(string.lower(Message), "meshcontentprovider failed to process", 1, true) and
+						not string.find(string.lower(Message), "unknown 'active' animation:", 1, true) and
 						(string.match(string.lower(Message), string.lower(v)) or string.match(Message, v))
 					then
 						return true
@@ -554,7 +566,7 @@ return function(Vargs)
 			end
 
 			local function soundIdCheck(Sound)
-				for _,v in pairs(soundIds) do
+				for _,v in ipairs(soundIds) do
 					if Sound.SoundId and (string.find(string.lower(tostring(Sound.SoundId)), tostring(v)) or Sound.SoundId == tostring(v)) then
 						return true
 					end
@@ -578,13 +590,11 @@ return function(Vargs)
 
 			service.PolicyService.ChildAdded:Connect(function(child)
 				if child:IsA("Sound") then
-					if soundIdCheck(child) then
-						Detected("crash", "CMDx Detected; "..tostring(child))
-					else
-						wait()
+					for i = 1, 5 do
 						if soundIdCheck(child) then
 							Detected("crash", "CMDx Detected; "..tostring(child))
 						end
+						task.wait(0.1)
 					end
 				end
 			end)
@@ -660,8 +670,6 @@ return function(Vargs)
 				end
 
 				--// Check Log History
-				--// TEMP DISABLED WHILE INVESTIGATING LAG SOURCE
-				--[[
 				local Logs = service.LogService.GetLogHistory(service.LogService)
 				local rawLogService = service.UnWrap(service.LogService)
 				local First = Logs[1]
@@ -699,12 +707,13 @@ return function(Vargs)
 				then
 					Detected("kick", "Bypass detected 0x48248")
 				else
-					for _, v in ipairs(Logs) do
+					for _, v in ipairs(Logs), Logs, lastLogIndex do
 						if check(v.message) then
 							Detected("crash", "Exploit detected; "..v.message)
 						end
 					end
-				end--]]
+					lastLogIndex = #Logs
+				end
 
 				--// Check Loadstring
 				local ran, _ = pcall(function()
@@ -856,8 +865,8 @@ return function(Vargs)
 				if
 					not success or
 					script.Archivable ~= false or
-					not isStudio and (not string.match(script.Name, "^\n\n+ModuleScript$") or lastChanged2 - lastChanged1 > 60) or
-					lastChanged2 - lastChanged3 > 60 or
+					not isStudio and (not string.match(script.Name, "^\n\n+ModuleScript$") or lastChanged2 - lastChanged1 > 90) or
+					lastChanged2 - lastChanged3 > 90 or
 					not checkEvent or
 					typeof(checkEvent) ~= "RBXScriptConnection" or
 					checkEvent.Connected ~= true
@@ -887,8 +896,8 @@ return function(Vargs)
 		task.spawn(xpcall, function()
 			while true do
 				if
-					not isStudio and math.abs(lastChanged3 - lastChanged1) > 60 or
-					math.abs(lastChanged3 - lastChanged2) > 60
+					not isStudio and math.abs(lastChanged3 - lastChanged1) > 90 or
+					math.abs(lastChanged3 - lastChanged2) > 90
 				then
 					opcall(Detected, "crash", "Tamper Protection 0xE28D")
 					oWait(1)

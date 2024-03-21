@@ -10,7 +10,6 @@ return function(Vargs, env)
 
 	local Routine = env.Routine
 	local Pcall = env.Pcall
-	local cPcall = env.cPcall
 
 	return {
 		ViewCommands = {
@@ -165,7 +164,7 @@ return function(Vargs, env)
 
 		CommsPanel = {
 			Prefix = Settings.PlayerPrefix;
-			Commands = {"notifications", "comms", "nc"};
+			Commands = {"notifications", "comms", "nc", "commspanel"};
 			Args = {};
 			Description = "Opens the communications panel, showing you all the Adonis messages you have recieved in a timeline";
 			AdminLevel = "Players";
@@ -255,9 +254,8 @@ return function(Vargs, env)
 			Function = function(plr: Player, args: {string})
 				local mats = {
 					"Brick", "Cobblestone", "Concrete", "CorrodedMetal", "DiamondPlate", "Fabric", "Foil", "ForceField", "Glass", "Granite",
-					"Grass", "Ice", "Marble", "Metal", "Neon", "Pebble", "Plastic", "Slate", "Sand", "SmoothPlastic", "Wood", "WoodPlanks"
-					--, "Rock", "Glacier", "Snow", "Sandstone", "Mud", "Basalt", "Ground", "CrackedLava", "Asphalt", "LeafyGrass", "Salt", "Limestone", "Pavement"
-					--Beta Features Materials
+					"Grass", "Ice", "Marble", "Metal", "Neon", "Pebble", "Plastic", "Slate", "Sand", "SmoothPlastic", "Wood", "WoodPlanks",
+					"Rock", "Glacier", "Snow", "Sandstone", "Mud", "Basalt", "Ground", "CrackedLava", "Asphalt", "LeafyGrass", "Salt", "Limestone", "Pavement"
 				}
 				for i, mat in mats do
 					mats[i] = {Text = mat; Desc = `Enum value: {Enum.Material[mat].Value}`}
@@ -299,14 +297,14 @@ return function(Vargs, env)
 			end
 		};
 
-		Ping = {
+		ClientPerfStats = {
 			Prefix = Settings.PlayerPrefix;
-			Commands = {"ping", "latency"};
+			Commands = {"cstats", "clientperformance", "clientperformanceststs", "clientstats", "ping", "latency", "fps","framespersecond"};
 			Args = {};
-			Description = "Shows you your current ping (latency)";
+			Description = "Shows you your client performance stats";
 			AdminLevel = "Players";
 			Function = function(plr: Player, args: {string})
-				Remote.MakeGui(plr, "Ping")
+				Remote.MakeGui(plr, "PerfStats")
 			end
 		};
 
@@ -396,7 +394,7 @@ return function(Vargs, env)
 										if ret then
 											if not answered then
 												answered = true
-												Commands.Teleport.Function(plr, {`@{plr.Name}`, p.Name})
+												Commands.Teleport.Function(plr, {p.Name, `@{plr.Name}`})
 											else
 												Remote.MakeGui(p, "Notification", {
 													Title = "Help Request";
@@ -434,6 +432,7 @@ return function(Vargs, env)
 			NoStudio = true; -- Commands which cannot be used in Roblox Studio (e.g. commands which use TeleportService)
 			AdminLevel = "Players";
 			Function = function(plr: Player, args: {string})
+				assert(#(service.Players:GetPlayers()) < service.Players.MaxPlayers or not Settings.DisableRejoinAtMaxPlayers, "Cannot rejoin while server is at max capacity.")
 				service.TeleportService:TeleportAsync(game.PlaceId, {plr}, service.New("TeleportOptions", {
 					ServerInstanceId = game.JobId
 				}))
@@ -455,6 +454,7 @@ return function(Vargs, env)
 				if UserId then
 					local success, found, _, placeId, jobId = pcall(service.TeleportService.GetPlayerPlaceInstanceAsync, service.TeleportService, UserId)
 					if success then
+						assert(jobId ~= service.DataModel.JobId, "You're already in this server!")
 						if found and placeId and jobId then
 							service.TeleportService:TeleportAsync(placeId, {plr}, service.New("TeleportOptions", {
 								ServerInstanceId = jobId
@@ -640,7 +640,7 @@ return function(Vargs, env)
 
 		ScriptInfo = {
 			Prefix = Settings.PlayerPrefix;
-			Commands = {"info", "about", "userpanel"};
+			Commands = {"info", "about", "userpanel", "script", "scriptinfo"};
 			Args = {};
 			Description = "Shows info about the admin system (Adonis)";
 			AdminLevel = "Players";
@@ -900,12 +900,24 @@ return function(Vargs, env)
 						local hasSafeChat = if policyInfo then
 							type(policyInfo) == "string" and policyInfo or table.find(policyInfo.AllowedExternalLinkReferences, "Discord") and "No" or "Yes"
 							else "[Redacted]"
+						
+						local mailVerif = select(2, xpcall(service.MarketplaceService.PlayerOwnsAsset, function() return "[Error]" end, service.MarketplaceService, v, 102611803))
+						local hasVerifiedMail = if elevated then
+							type(mailVerif) == "string" and mailVerif or mailVerif and "Yes" or "No"
+							else "[Redacted]"
+						
+						local idVerif = select(2, xpcall(v.IsVerified, function() return "[Error]" end, v))
+						local hasVerifiedId = if elevated then
+							type(idVerif) == "string" and idVerif or idVerif and "Yes" or "No"
+							else "[Redacted]"
 
 						Remote.RemoveGui(plr, `Profile_{v.UserId}`)
 						Remote.MakeGui(plr, "Profile", {
 							Target = v;
 							SafeChat = hasSafeChat;
 							CanChatGet = table.pack(pcall(service.Chat.CanUserChatAsync, service.Chat, v.UserId));
+							MailVerified = hasVerifiedMail;
+							IDVerified = hasVerifiedId;
 							IsDonor = Admin.CheckDonor(v);
 							GameData = gameData;
 							IsServerOwner = v.UserId == game.PrivateServerOwnerId;
@@ -1142,14 +1154,12 @@ return function(Vargs, env)
 				local assetId = assert(tonumber(args[1]), "Missing asset ID (argument #1)")
 				local success, assetAlreadyOwned = pcall(service.MarketplaceService.PlayerOwnsAsset, service.MarketplaceService, plr, assetId)
 				assert(not (success and assetAlreadyOwned), "You already own the asset!")
+				local success, assetInfo = pcall(service.MarketplaceService.GetProductInfo, service.MarketplaceService, assetId)
+				assert(success and not assetInfo.IsLimited, "Cannot buy limited assets!")
 				local connection; connection = service.MarketplaceService.PromptPurchaseFinished:Connect(function(_, boughtAssetId, isPurchased)
 					if boughtAssetId == assetId then
 						connection:Disconnect()
-						Remote.MakeGui(plr, "Notification", {
-							Title = "Adonis purchase";
-							Message = (isPurchased and string.format("Asset %d was purchased successfully!", assetId) or string.format("Asset %d was not bought", assetId));
-							Time = 10;
-						})
+						Functions.Notification("Adonis purchase", (isPurchased and string.format("Asset %d was purchased successfully!", assetId) or string.format("Asset %d was not bought", assetId)), {plr}, 10, "MatIcon://Shopping cart")
 					end
 				end)
 				service.MarketplaceService:PromptPurchase(plr, assetId, false)

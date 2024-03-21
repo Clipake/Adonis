@@ -1,8 +1,6 @@
 --!nonstrict
 --[[
 
-	DEVELOPMENT HAS BEEN MOVED FROM DAVEY_BONES/SCELERATIS TO THE EPIX INCORPORATED GROUP
-
 	CURRENT LOADER:
 	https://www.roblox.com/library/7510622625/Adonis-Admin-Loader-Epix-Incorporated
 
@@ -28,7 +26,11 @@ local warn = function(...)
 	warn(":: Adonis ::", ...)
 end
 
-warn("Loading...")
+local print = function(...)
+	print(":: Adonis ::", ...)
+end
+
+print("Loading...")
 
 local ServerScriptService = game:GetService("ServerScriptService")
 local RunService = game:GetService("RunService")
@@ -51,7 +53,6 @@ else
 	local configFolder = model.Config
 	local loaderFolder = model.Loader
 
-	local dropper = loaderFolder.Dropper
 	local loader = loaderFolder.Loader
 	local runner = script
 
@@ -65,8 +66,8 @@ else
 		Settings = {} :: {[string]: any};
 		Descriptions = {} :: {[string]: string};
 		Messages = {} :: {string|{[string]: any}};
-		ServerPlugins = {} :: {ModuleScript};
-		ClientPlugins = {} :: {ModuleScript};
+		ServerPlugins = {} :: {ModuleScript|string};
+		ClientPlugins = {} :: {ModuleScript|string};
 		Packages = {} :: {Folder};
 		Themes = {} :: {Instance};
 
@@ -76,13 +77,12 @@ else
 		Core = loaderFolder;
 
 		Loader = loader;
-		Dopper = dropper;
 		Runner = runner;
 
 		ModuleID = 7510592873;  		--// https://www.roblox.com/library/7510592873/Adonis-MainModule
 		LoaderID = 7510622625;			--// https://www.roblox.com/library/7510622625/Adonis-Loader-Sceleratis-Davey-Bones-Epix
 		
-		--// Note: The nightly module is updated frequently with ever commit merged to the master branch on the Adonis repo.
+		--// Note: The nightly module is updated frequently with every commit merged to the master branch on the Adonis repo.
 		--// It is prone to breaking, unstable, untested, and should not be used for anything other than testing/feature preview.
 		NightlyMode = false;			--// If true, uses the nightly module instead of the current release module.
 		NightlyModuleID = 8612978896; 	--// https://www.roblox.com/library/8612978896/Nightlies-Adonis-MainModule
@@ -108,7 +108,7 @@ else
 				break
 			end
 		end
-		if not moduleId then
+		if not moduleId and not data.NightlyMode then
 			error(`Adonis DebugMode is enabled but no ModuleScript named 'MainModule' is found in {model.Parent:GetFullName()}`)
 		end
 	end
@@ -153,7 +153,7 @@ else
 	end
 
 	if tonumber(moduleId) then
-		warn(`Requiring Adonis MainModule; Model URL: https://www.roblox.com/library/{moduleId}`)
+		print(`Requiring Adonis MainModule; Model URL: https://www.roblox.com/library/{moduleId}`)
 	end
 
 	local module = require(moduleId)

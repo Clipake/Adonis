@@ -10,7 +10,7 @@ return function(data, env)
 		Name = "Credits",
 		Title = "Credits",
 		Icon = client.MatIcons.Grade,
-		Size = { 280, 300 },
+		Size = { 280, 340 },
 		AllowMultiple = false,
 	})
 	if not window then
@@ -25,7 +25,7 @@ return function(data, env)
 	local Credits = require(client.Shared.Credits)
 	for _, tab in ipairs({
 		[1] = tabFrame:NewTab("Main", { Text = "Main" }),
-		[2] = tabFrame:NewTab("GitHub", { Text = "Contributors" }),
+		[2] = tabFrame:NewTab("Contributors", { Text = "Contributors" }),
 		[3] = tabFrame:NewTab("Misc", { Text = "Everyone Else" }),
 	}) do
 		local scroller = tab:Add("ScrollingFrame", {
@@ -61,7 +61,7 @@ return function(data, env)
 			for _, credit in ipairs(Credits[tab.Name]) do
 				if
 					(string.lower(string.sub(credit.Text, 1, #filter)) == string.lower(filter))
-					or (tab.Name == "GitHub" and string.lower(string.sub(credit.Text, 9, 8 + #filter)) == string.lower(filter))
+					or (tab.Name == "Contributors" and string.lower(string.sub(credit.Text, 9, 8 + #filter)) == string.lower(filter))
 				then
 					scroller:Add("TextLabel", {
 						Text = `  {credit.Text} `,

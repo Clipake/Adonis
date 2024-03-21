@@ -1,11 +1,10 @@
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------
--- Trello API Documentation: 	https://trello.com/docs/																									     --
---								https://developers.trello.com/advanced-reference																			     --
+-- Trello API Documentation: 																							     --
 --																																							     --
--- App Key Link: 			 	https://trello.com/app-key																						    			 --
+-- App Key Link: 			 	/app-key																						    			 --
 --																																				  				 --
--- Token Link:   			 	https://trello.com/1/connect?name=Trello_API_Module&response_type=token&expires=never&scope=read,write&key=YOUR_APP_KEY_HERE     --
--- Replace "YOUR_APP_KEY_HERE" with the App Key from https://trello.com/app-key																					 --
+-- Token Link:   			 	/1/connect?name=Trello_API_Module&response_type=token&expires=never&scope=read,write&key=YOUR_APP_KEY_HERE     --
+-- Replace "YOUR_APP_KEY_HERE" with the App Key from /app-key																					 --
 -- Trello API Remade by imskyyc for Kronos and Adonis - original by Sceleratis / Davey_Bones for Adonis.																	 --
 -- It is requested that existing credits remain here.																											 --
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -37,20 +36,6 @@ local RateLimit = function()
 end
 
 local HttpFunctions; HttpFunctions = {
-	--// Same as the GetRandom() function
-	GenerateRequestID = function()
-		local format = string.format
-		local random = math.random
-
-		local Len = random(5,10)
-
-		local Res = {};
-		for Idx = 1, Len do
-			Res[Idx] = format('%02x', random(126));
-		end;
-		return table.concat(Res)
-	end;
-
 	Decode = function(str)
 		local success, tab = pcall(function()
 			return HttpService:JSONDecode(str)
@@ -80,7 +65,7 @@ local HttpFunctions; HttpFunctions = {
 	end;
 
 	Request = function(Url, Method, Headers, Body)
-		local RequestID = HttpFunctions.GenerateRequestID()
+		local RequestID = HttpService:GenerateGUID(false)
 		local ran, response = pcall(function()
 			local Request = {
 				Url = Url;
@@ -111,7 +96,7 @@ local HttpFunctions; HttpFunctions = {
 	end;
 
 	Get = function(Url)
-		local RequestID = HttpFunctions.GenerateRequestID()
+		local RequestID = HttpService:GenerateGUID(false)
 		Queue[RequestID] = Url
 		RateLimit()
 
@@ -129,7 +114,7 @@ local HttpFunctions; HttpFunctions = {
 	end;
 
 	Post = function(Url, Data, Type)
-		local RequestID = HttpFunctions.GenerateRequestID()
+		local RequestID = HttpService:GenerateGUID(false)
 		Queue[RequestID] = Url
 		RateLimit()
 
@@ -172,7 +157,6 @@ return function(AppKey, Token)
 	AppKey = AppKey or ""
 	Token = Token or ""
 
-	local Base = "https://trello.com/1/"
 	local Arguments = `key={AppKey}&token={Token}`
 
 	local GetUrl = function(str)
@@ -182,7 +166,7 @@ return function(AppKey, Token)
 		else
 			Token=`?{Arguments}`
 		end
-		return `{Base}{str}{Token}`
+		return `https://trello.com/1/{str}{Token}`
 	end;
 	
 	local CheckHttp = function()

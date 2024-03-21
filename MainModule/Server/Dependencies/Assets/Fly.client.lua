@@ -42,10 +42,6 @@ function Check()
 	end
 end
 
-function tranVec(num)
-	return Vector3.new(num, num, num)
-end
-
 function getCF(part, isFor)
 	local cframe = part.CFrame
 	local noRot = CFrame.new(cframe.p)
@@ -67,10 +63,10 @@ function Start()
 	end)
 
 	bPos.Position = part.Position
-	bPos.MaxForce = tranVec(math.huge)
+	bPos.MaxForce = math.huge
 
 	bGyro.CFrame = part.CFrame
-	bGyro.MaxTorque = tranVec(9e9)
+	bGyro.MaxTorque = 9e9
 
 	antiLoop = antiReLoop
 
@@ -150,11 +146,11 @@ function Stop()
 	human.PlatformStand = false
 
 	if bPos then
-		bPos.MaxForce = tranVec(0)
+		bPos.MaxForce = 0
 	end
 
 	if bGyro then
-		bGyro.MaxTorque = tranVec(0)
+		bGyro.MaxTorque = 0
 	end
 
 	if conn then
@@ -242,7 +238,9 @@ function DPadifyInput(direction, isGame)
 	if yDir == 0 then HandleInput("Forward", isGame, false); HandleInput("Backward", isGame, false) end
 end
 
-listenConnection(part.DescendantRemoving, function(Inst)
+task.spawn(function()
+	local Inst = part.DescendantRemoving:Wait()
+
 	if Inst == bPos or Inst == bGyro or Inst == speedVal or Inst == noclip then
 		if conn then
 			conn:Disconnect()
@@ -251,7 +249,7 @@ listenConnection(part.DescendantRemoving, function(Inst)
 		for _, Signal in pairs(RBXConnections) do
 			Signal:Disconnect()
 		end
-		
+
 		contextService:UnbindAction("Toggle Flight")
 
 		Stop()

@@ -1,6 +1,5 @@
 server = nil
 service = nil
-cPcall = nil
 Pcall = nil
 Routine = nil
 GetEnv = nil
@@ -43,10 +42,12 @@ return function(Vargs, GetEnv)
 			Hidden = t.boolean,
 			Disabled = t.boolean,
 			NoStudio = t.boolean,
+			NoLog = t.boolean,
 			NonChattable = t.boolean,
 			AllowDonors = t.boolean,
 			Donors = t.boolean,
 			Filter = t.boolean,
+			Dangerous = t.boolean,
 			Function = t.callback,
 			ListUpdater = t.optional(t.union(t.string, t.callback))
 		})
@@ -71,14 +72,16 @@ return function(Vargs, GetEnv)
 				Hidden = false;
 				Disabled = false;
 				NoStudio = false;
+				NoLog = false;
 				NonChattable = false;
 				AllowDonors = false;
 				Donors = false;
 				CrossServerDenied = false;
 				IsCrossServer = false;
 				Filter = false;
+				Dangerous = false;
 				Function = function(plr)
-					Remote.MakeGui(plr, "Output", {Message = "No command implementation"})
+					Remote.MakeGui(plr, "Output", {Title = "Error", Message = "No command implementation"})
 				end
 				}
 			do
@@ -118,7 +121,12 @@ return function(Vargs, GetEnv)
 						if type(cmd.ListUpdater) == "function" then
 							return cmd.ListUpdater(plr, ...)
 						end
-						return Logs[cmd.ListUpdater]
+						--// will change how this works later
+						local LogTable = Logs[cmd.ListUpdater]
+						if LogTable and LogTable.__meta == "DLL" then
+							return LogTable:GetAsTable()
+						end
+						return LogTable
 					end
 				end
 			end
